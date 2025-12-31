@@ -1,42 +1,214 @@
-#root {
-  max-width: 1280px;
+/* MAIN APP */
+.app {
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 40px 20px;
+}
+
+/* LANDING / CONNECT */
+.landing {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+}
+
+.logo-large {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--yellow-main);
+  letter-spacing: 2px;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--yellow-main);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.wallet {
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
+/* CARDS */
 .card {
-  padding: 2em;
+  background-color: var(--black-card);
+  border: 1px solid var(--black-border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
 }
 
-.read-the-docs {
-  color: #888;
+.card h2 {
+  margin-bottom: 16px;
+  font-size: 18px;
+  color: var(--yellow-main);
+}
+
+/* BALANCE */
+.balance {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.balance div {
+  display: flex;
+  flex-direction: column;
+}
+
+.balance span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.balance strong {
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+/* INPUTS */
+.input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--black-border);
+  background-color: var(--black-main);
+  color: var(--text-main);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* BUTTONS */
+.button-primary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: var(--yellow-main);
+  color: #000;
+  font-weight: 600;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.button-primary:hover {
+  background-color: var(--yellow-hover);
+  transform: translateY(-1px);
+}
+
+.button-secondary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--yellow-main);
+  border: 1px solid var(--yellow-main);
+  font-weight: 600;
+}
+
+.button-secondary:hover {
+  background-color: rgba(255, 212, 0, 0.1);
+}
+
+.button-warning {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: #dc2626;
+  color: #fff;
+  font-weight: 600;
+}
+
+.button-warning:hover {
+  background-color: #b91c1c;
+}
+
+/* ORACLE */
+.oracle {
+  border: 1px solid #dc2626;
+}
+
+/* ODDS */
+.odds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.odd {
+  background-color: var(--black-main);
+  border: 1px solid var(--black-border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  color: var(--text-main);
+  transition: all 0.2s;
+}
+
+.odd span {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.odd strong {
+  display: block;
+  font-size: 20px;
+  margin-top: 6px;
+}
+
+.odd:hover {
+  border-color: var(--yellow-main);
+}
+
+.odd.active {
+  background-color: var(--yellow-main);
+  color: #000;
+  border-color: var(--yellow-main);
+}
+
+.odd.active span {
+  color: #000;
+}
+
+/* BET SLIP */
+.bet-slip {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 260px;
+  background-color: #111;
+  color: #ffeb3b; 
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 1000;
+}
+
+.bet-slip h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.bet-slip .input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.bet-slip .button-primary {
+  width: 100%;
 }
