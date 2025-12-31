@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { connectLiquidityPool, connectPredictionMarket } from "./utils/contractUtils";
 
@@ -11,13 +11,13 @@ function App() {
   const [betAmount, setBetAmount] = useState<string>("0");
   const [betOutcome, setBetOutcome] = useState<number>(0);
   const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
+  const [oracleAddress, setOracleAddress] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<string>("0");
   const [totalLiquidity, setTotalLiquidity] = useState<string>("0");
 
   const liquidityPoolAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const predictionMarketAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
-  // Conectare wallet + contracte
   const connectWalletAndContracts = async () => {
     if ((window as any).ethereum) {
       try {
@@ -35,16 +35,15 @@ function App() {
         setLpContract(lp);
         setPmContract(pm);
 
-        // Preluăm owner-ul PredictionMarket
         const ownerAddr = await pm.owner();
         setOwnerAddress(ownerAddr);
 
+        const oracleAddr = await pm.oracle();
+        setOracleAddress(oracleAddr);
+
         console.log("Wallet și contracte conectate:", address);
 
-        // Inițializare balanțe
         updateBalances(lp, address);
-
-        // Ascultare evenimente
         setupEventListeners(lp, pm, address);
       } catch (err) {
         console.error(err);
@@ -55,7 +54,6 @@ function App() {
     }
   };
 
-  // Actualizare balanțe din LiquidityPool
   const updateBalances = async (lp: any, addr: string) => {
     try {
       const balance = await lp.getBalance(addr);
@@ -67,9 +65,7 @@ function App() {
     }
   };
 
-  // Setup event listeners pentru actualizare în timp real
   const setupEventListeners = (lp: any, pm: any, addr: string) => {
-    // LiquidityPool events
     lp.on("Deposited", (user: string, amount: bigint) => {
       console.log(`Deposited: ${user} a depus ${ethers.formatEther(amount)} ETH`);
       if (user.toLowerCase() === addr.toLowerCase()) {
@@ -84,7 +80,6 @@ function App() {
       }
     });
 
-    // PredictionMarket events
     pm.on("BetPlaced", (_eventId: bigint, bettor: string, amount: bigint, outcome: number) => {
       console.log(`BetPlaced: ${bettor} a pariat ${ethers.formatEther(amount)} ETH pe outcome ${outcome}`);
     });
@@ -97,7 +92,6 @@ function App() {
     });
   };
 
-  // Deposit ETH în LiquidityPool
   const handleDeposit = async () => {
     if (!lpContract || !account) return;
     try {
@@ -110,7 +104,6 @@ function App() {
     }
   };
 
-  // Place Bet în PredictionMarket
   const handlePlaceBet = async () => {
     if (!pmContract) return;
     try {
@@ -123,16 +116,18 @@ function App() {
     }
   };
 
-  // Payout (doar owner)
-  const handlePayout = async () => {
-    if (!pmContract) return;
+  const handleOracleSetWinner = async () => {
+    if (!pmContract || !oracleAddress || account?.toLowerCase() !== oracleAddress.toLowerCase()) {
+      alert("Doar Oracle-ul poate seta câștigătorul!");
+      return;
+    }
     try {
-      const tx = await pmContract.payout(1, 0);
+      const tx = await pmContract.setWinningOutcome(1, 0);
       await tx.wait();
-      alert("Payout executat!");
+      alert("Oracle a setat câștigătorul!");
     } catch (err) {
       console.error(err);
-      alert("Payout eșuat");
+      alert("Eroare la setWinningOutcome");
     }
   };
 
@@ -143,8 +138,6 @@ function App() {
       {account ? (
         <div>
           <p>Wallet conectat: {account}</p>
-
-          {/* Balanțe */}
           <div style={{ marginTop: "10px" }}>
             <p>Balanța ta în Liquidity Pool: {userBalance} ETH</p>
             <p>Total Liquidity în Pool: {totalLiquidity} ETH</p>
@@ -182,11 +175,11 @@ function App() {
             <button onClick={handlePlaceBet}>Place Bet</button>
           </div>
 
-          {/* Payout doar pentru owner */}
-          {ownerAddress === account && (
+          {/* Simulate Oracle */}
+          {oracleAddress === account && (
             <div style={{ marginTop: "20px" }}>
-              <h2>Payout (Owner Only)</h2>
-              <button onClick={handlePayout}>Execute Payout</button>
+              <h2>Simulate Oracle - Set Winner</h2>
+              <button onClick={handleOracleSetWinner}>Set Winner (Oracle)</button>
             </div>
           )}
         </div>
