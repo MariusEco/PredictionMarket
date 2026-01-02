@@ -1,150 +1,153 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ethers } from "ethers";
 import "./App.css";
 import { connectLiquidityPool, connectPredictionMarket } from "./utils/contractUtils";
 
+type Match = {
+  id: number;
+  home: string;
+  away: string;
+  time: string;   // ora de start sau "LIVE"
+  score: string;  // scor live sau 0 - 0
+  minute?: number; // minutul meciului dacă e live
+};
+
 function App() {
   const [account, setAccount] = useState<string | null>(null);
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  const [_, setProvider] = useState<ethers.BrowserProvider | null>(null);
   const [lpContract, setLpContract] = useState<any>(null);
   const [pmContract, setPmContract] = useState<any>(null);
+
   const [depositAmount, setDepositAmount] = useState<string>("0");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("0");
-  const [betAmount, setBetAmount] = useState<string>("0");
-  const [betOutcome, setBetOutcome] = useState<number>(0);
-  const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
-  const [oracleAddress, setOracleAddress] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<string>("0");
   const [totalLiquidity, setTotalLiquidity] = useState<string>("0");
+
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [selectedMatch, setSelectedMatch] = useState<number | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
+  const [betAmount, setBetAmount] = useState<string>("0");
 
   const liquidityPoolAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const predictionMarketAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
   const connectWalletAndContracts = async () => {
-    if ((window as any).ethereum) {
-      try {
-        const prov = new ethers.BrowserProvider((window as any).ethereum);
-        await prov.send("eth_requestAccounts", []);
-        setProvider(prov);
-
-        const signer = await prov.getSigner();
-        const address = await signer.getAddress();
-        setAccount(address);
-
-        const lp = await connectLiquidityPool(prov, liquidityPoolAddress);
-        const pm = await connectPredictionMarket(prov, predictionMarketAddress);
-
-        setLpContract(lp);
-        setPmContract(pm);
-
-        const ownerAddr = await pm.owner();
-        setOwnerAddress(ownerAddr);
-
-        const oracleAddr = await pm.oracle();
-        setOracleAddress(oracleAddr);
-
-        console.log("Wallet and contracts connected:", address);
-
-        updateBalances(lp, address);
-        setupEventListeners(lp, pm, address);
-      } catch (err) {
-        console.error(err);
-        alert("Error connecting wallet or contracts");
-      }
-    } else {
+    if (!(window as any).ethereum) {
       alert("Please install MetaMask!");
+      return;
     }
+
+    const prov = new ethers.BrowserProvider((window as any).ethereum);
+    await prov.send("eth_requestAccounts", []);
+    setProvider(prov);
+
+    const signer = await prov.getSigner();
+    const address = await signer.getAddress();
+    setAccount(address);
+
+    const lp = await connectLiquidityPool(prov, liquidityPoolAddress);
+    const pm = await connectPredictionMarket(prov, predictionMarketAddress);
+
+    setLpContract(lp);
+    setPmContract(pm);
+
+    await updateBalances(lp, address);
+    setupEventListeners(lp, pm, address);
+    fetchTodayMatches();
   };
 
   const updateBalances = async (lp: any, addr: string) => {
-    try {
-      const balance = await lp.getBalance(addr);
-      const total = await lp.totalLiquidity();
-      setUserBalance(ethers.formatEther(balance));
-      setTotalLiquidity(ethers.formatEther(total));
-    } catch (err) {
-      console.error("Error fetching balances:", err);
-    }
+    const bal = await lp.getBalance(addr);
+    const total = await lp.totalLiquidity();
+    setUserBalance(ethers.formatEther(bal));
+    setTotalLiquidity(ethers.formatEther(total));
   };
 
   const setupEventListeners = (lp: any, pm: any, addr: string) => {
-    lp.on("Deposited", (user: string, amount: bigint) => {
-      console.log(`Deposited: ${user} deposited ${ethers.formatEther(amount)} ETH`);
+    lp.on("Deposited", (user: string, _: bigint) => {
       if (user.toLowerCase() === addr.toLowerCase()) {
         updateBalances(lp, addr);
       }
     });
 
-    lp.on("Withdrawn", (user: string, amount: bigint) => {
-      console.log(`Withdrawn: ${user} withdrew ${ethers.formatEther(amount)} ETH`);
+    lp.on("Withdrawn", (user: string, _: bigint) => {
       if (user.toLowerCase() === addr.toLowerCase()) {
         updateBalances(lp, addr);
       }
     });
 
     pm.on("BetPlaced", (_eventId: bigint, bettor: string, amount: bigint, outcome: number) => {
-      console.log(`BetPlaced: ${bettor} placed ${ethers.formatEther(amount)} ETH on outcome ${outcome}`);
+      console.log(`Bet placed by ${bettor} of ${ethers.formatEther(amount)} ETH on outcome ${outcome}`);
     });
 
     pm.on("Payout", (_eventId: bigint, bettor: string, amount: bigint) => {
-      console.log(`Payout: ${bettor} won ${ethers.formatEther(amount)} ETH`);
       if (bettor.toLowerCase() === addr.toLowerCase()) {
+        console.log(`You won ${ethers.formatEther(amount)} ETH`);
         updateBalances(lp, addr);
       }
     });
   };
 
-  const handleDeposit = async () => {
-    if (!lpContract || !account) return;
+  const fetchTodayMatches = async () => {
     try {
-      const tx = await lpContract.deposit({ value: ethers.parseEther(depositAmount) });
-      await tx.wait();
-      alert("Deposit successful!");
+      const today = new Date().toISOString().split("T")[0];
+      const res = await fetch(
+        `https://v3.football.api-sports.io/fixtures?date=${today}`,
+        {
+          headers: { "x-apisports-key": import.meta.env.VITE_API_SPORTS_KEY },
+        }
+      );
+      const data = await res.json();
+
+      const ongoing = data.response.filter((m: any) => m.fixture.status.short !== "FT");
+
+      const allMatches: Match[] = ongoing.map((m: any) => {
+        const isLive = m.fixture.status.short !== "NS"; // NS = Not started
+        const timeOrLive = isLive
+          ? "LIVE"
+          : new Date(m.fixture.date).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Europe/Bucharest",
+            });
+        const score = isLive
+          ? `${m.goals.home} - ${m.goals.away}`
+          : "0 - 0";
+
+        return {
+          id: m.fixture.id,
+          home: m.teams.home.name,
+          away: m.teams.away.name,
+          time: timeOrLive,
+          score: score,
+          minute: isLive ? m.fixture.status.elapsed : undefined, // minut live
+        };
+      });
+
+      setMatches(allMatches);
     } catch (err) {
-      console.error(err);
-      alert("Deposit failed");
+      console.error("Failed to fetch matches", err);
     }
+  };
+
+  const handleDeposit = async () => {
+    if (!lpContract) return;
+    const tx = await lpContract.deposit({ value: ethers.parseEther(depositAmount) });
+    await tx.wait();
   };
 
   const handleWithdraw = async () => {
-    if (!lpContract || !account) return;
-    try {
-      const tx = await lpContract.withdraw(ethers.parseEther(withdrawAmount));
-      await tx.wait();
-      alert("Withdraw successful!");
-    } catch (err) {
-      console.error(err);
-      alert("Withdraw failed");
-    }
+    if (!lpContract) return;
+    const tx = await lpContract.withdraw(ethers.parseEther(withdrawAmount));
+    await tx.wait();
   };
 
   const handlePlaceBet = async () => {
-    if (!pmContract || selectedOutcome === null) return;
-    try {
-      const tx = await pmContract.placeBet(1, selectedOutcome, { value: ethers.parseEther(betAmount) });
-      await tx.wait();
-      alert("Bet placed!");
-      setSelectedOutcome(null);
-    } catch (err) {
-      console.error(err);
-      alert("Bet failed");
-    }
-  };
-
-  const handleOracleSetWinner = async () => {
-    if (!pmContract || !oracleAddress || account?.toLowerCase() !== oracleAddress.toLowerCase()) {
-      alert("Only the Oracle can set the winner!");
-      return;
-    }
-    try {
-      const tx = await pmContract.setWinningOutcome(1, 0);
-      await tx.wait();
-      alert("Oracle set the winner!");
-    } catch (err) {
-      console.error(err);
-      alert("Error setting winning outcome");
-    }
+    if (!pmContract || selectedOutcome === null || selectedMatch === null) return;
+    const tx = await pmContract.placeBet(selectedMatch, selectedOutcome, { value: ethers.parseEther(betAmount) });
+    await tx.wait();
+    setSelectedOutcome(null);
+    setSelectedMatch(null);
   };
 
   return (
@@ -152,9 +155,7 @@ function App() {
       {!account ? (
         <div className="landing">
           <div className="logo-large">BETCHAIN</div>
-          <button className="button-primary" onClick={connectWalletAndContracts}>
-            Connect Wallet
-          </button>
+          <button className="button-primary" onClick={connectWalletAndContracts}>Connect Wallet</button>
         </div>
       ) : (
         <>
@@ -163,6 +164,11 @@ function App() {
             <div className="logo">BETCHAIN</div>
             <div className="wallet">{account}</div>
           </div>
+
+          {/* BUTTON MANUAL UPDATE MATCHES */}
+          <button className="button-primary" onClick={fetchTodayMatches}>
+            Update Matches
+          </button>
 
           {/* BALANCES */}
           <div className="card balance">
@@ -176,94 +182,49 @@ function App() {
             </div>
           </div>
 
-          {/* ODDS */}
-          <div className="card">
-            <h2>Match Odds (1X2)</h2>
-            <div className="odds">
-              <button
-                className={`odd ${selectedOutcome === 0 ? "active" : ""}`}
-                onClick={() => setSelectedOutcome(selectedOutcome === 0 ? null : 0)}
-              >
-                <span>1</span>
-                <strong>2.00</strong>
-              </button>
-              <button
-                className={`odd ${selectedOutcome === 1 ? "active" : ""}`}
-                onClick={() => setSelectedOutcome(selectedOutcome === 1 ? null : 1)}
-              >
-                <span>X</span>
-                <strong>3.20</strong>
-              </button>
-              <button
-                className={`odd ${selectedOutcome === 2 ? "active" : ""}`}
-                onClick={() => setSelectedOutcome(selectedOutcome === 2 ? null : 2)}
-              >
-                <span>2</span>
-                <strong>3.80</strong>
-              </button>
-            </div>
-          </div>
-
-          {/* BET SLIP */}
-          {selectedOutcome !== null && (
-            <div className="bet-slip">
-              <h2>Bet Slip</h2>
-              <p>
-                Selected outcome:{" "}
-                <strong>
-                  {selectedOutcome === 0 ? "1" : selectedOutcome === 1 ? "X" : "2"}
-                </strong>
-              </p>
-
-              <input
-                className="input"
-                type="text"
-                placeholder="Stake (ETH)"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
-              />
-
-              <button className="button-primary" onClick={handlePlaceBet}>
-                Place Bet
-              </button>
-            </div>
-          )}
-
-          {/* DEPOSIT */}
+          {/* LIQUIDITY POOL */}
           <div className="card">
             <h2>Liquidity Pool</h2>
+            <input className="input" placeholder="Deposit ETH" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
+            <button className="button-secondary" onClick={handleDeposit}>Deposit</button>
 
-            <input
-              className="input"
-              placeholder="Deposit ETH"
-              value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
-            />
-            <button className="button-secondary" onClick={handleDeposit}>
-              Deposit
-            </button>
-
-            <input
-              className="input"
-              placeholder="Withdraw ETH"
-              value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(e.target.value)}
-              style={{ marginTop: "12px" }}
-            />
-            <button className="button-secondary" onClick={handleWithdraw}>
-              Withdraw
-            </button>
+            <input className="input" placeholder="Withdraw ETH" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} />
+            <button className="button-secondary" onClick={handleWithdraw}>Withdraw</button>
           </div>
 
-          {/* ORACLE */}
-          {oracleAddress === account && (
-            <div className="card oracle">
-              <h2>Oracle Control</h2>
-              <button className="button-warning" onClick={handleOracleSetWinner}>
-                Set Winning Outcome
-              </button>
+          {/* MATCH ODDS */}
+          {matches.map((m) => (
+            <div key={m.id} className="card">
+              <h2>{m.home} vs {m.away}</h2>
+              <p className="timetext">
+                {m.time === "LIVE" ? (
+                  <span style={{color: "red"}}>LIVE {m.minute}'</span>
+                ) : (
+                  `Start: ${m.time}`
+                )} | Score: {m.score}
+              </p>
+              <div className="odds">
+                <button className={`odd ${selectedMatch === m.id && selectedOutcome === 0 ? "active" : ""}`}
+                  onClick={() => { setSelectedMatch(m.id); setSelectedOutcome(0); }}>1</button>
+                <button className={`odd ${selectedMatch === m.id && selectedOutcome === 1 ? "active" : ""}`}
+                  onClick={() => { setSelectedMatch(m.id); setSelectedOutcome(1); }}>X</button>
+                <button className={`odd ${selectedMatch === m.id && selectedOutcome === 2 ? "active" : ""}`}
+                  onClick={() => { setSelectedMatch(m.id); setSelectedOutcome(2); }}>2</button>
+              </div>
+            </div>
+          ))}
+
+          {/* BET SLIP */}
+          {selectedMatch !== null && (
+            <div className="bet-slip">
+              <h2>Bet Slip</h2>
+              <p>Selected Match: {matches.find(m => m.id === selectedMatch)?.home} vs {matches.find(m => m.id === selectedMatch)?.away}</p>
+              <p>Selected outcome: {selectedOutcome === 0 ? "1" : selectedOutcome === 1 ? "X" : "2"}</p>
+              <input className="input" placeholder="Stake (ETH)" value={betAmount} onChange={e => setBetAmount(e.target.value)} />
+              <button className="button-primary" onClick={handlePlaceBet}>Place Bet</button>
             </div>
           )}
+
         </>
       )}
     </div>
