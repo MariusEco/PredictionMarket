@@ -3,35 +3,27 @@ import { network } from "hardhat";
 async function main() {
     const { ethers } = await network.connect({ network: "localhost", chainType: "l1" });
 
-    const [deployer, oracle] = await ethers.getSigners();
-    console.log("Deployer account:", deployer.address);
-    console.log("Oracle account:", oracle.address);
+    const [deployer] = await ethers.getSigners();
+    console.log("Deployer:", deployer.address);
 
-    console.log("\nDeploying LiquidityPool...");
-    const LiquidityPoolFactory: any = await ethers.deployContract("LiquidityPool");
-    await LiquidityPoolFactory.waitForDeployment();
-    const poolAddress = await LiquidityPoolFactory.getAddress();
-    console.log("LiquidityPool deployed at:", poolAddress);
+    const LiquidityPool = await ethers.deployContract("LiquidityPool");
+    await LiquidityPool.waitForDeployment();
 
-    console.log("\nDeploying PredictionMarket...");
-    const PredictionMarketFactory: any = await ethers.deployContract("PredictionMarket", [poolAddress]);
-    await PredictionMarketFactory.waitForDeployment();
-    const predictionAddress = await PredictionMarketFactory.getAddress();
-    console.log("PredictionMarket deployed at:", predictionAddress);
+    const PredictionMarket = await ethers.deployContract(
+        "PredictionMarket",
+        [await LiquidityPool.getAddress()]
+    );
+    await PredictionMarket.waitForDeployment();
 
-    const lpWithSigner: any = LiquidityPoolFactory.connect(deployer);
-    const tx1 = await lpWithSigner.setPredictionMarket(predictionAddress);
-    await tx1.wait();
-    console.log("PredictionMarket set in LiquidityPool");
+    const SportsOracle = await ethers.deployContract("SportsOracle");
+    await SportsOracle.waitForDeployment();
 
-    const pmWithSigner: any = PredictionMarketFactory.connect(deployer);
-    const tx2 = await pmWithSigner.setOracle(oracle.address);
-    await tx2.wait();
-    console.log("Oracle set in PredictionMarket:", oracle.address);
+    await LiquidityPool.setPredictionMarket(await PredictionMarket.getAddress());
+    await PredictionMarket.setSportsOracle(await SportsOracle.getAddress());
 
+    console.log("LiquidityPool:", await LiquidityPool.getAddress());
+    console.log("PredictionMarket:", await PredictionMarket.getAddress());
+    console.log("SportsOracle:", await SportsOracle.getAddress());
 }
 
-main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-});
+main().catch(console.error);

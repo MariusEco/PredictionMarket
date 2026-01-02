@@ -124,24 +124,6 @@
   background-color: rgba(255, 212, 0, 0.1);
 }
 
-.button-warning {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  background-color: #dc2626;
-  color: #fff;
-  font-weight: 600;
-}
-
-.button-warning:hover {
-  background-color: #b91c1c;
-}
-
-/* ORACLE */
-.oracle {
-  border: 1px solid #dc2626;
-}
-
 /* ODDS */
 .odds {
   display: grid;
@@ -159,17 +141,6 @@
   transition: all 0.2s;
 }
 
-.odd span {
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-.odd strong {
-  display: block;
-  font-size: 20px;
-  margin-top: 6px;
-}
-
 .odd:hover {
   border-color: var(--yellow-main);
 }
@@ -180,8 +151,11 @@
   border-color: var(--yellow-main);
 }
 
-.odd.active span {
-  color: #000;
+/* Text adjustment */
+.timetext {
+  position: relative;
+  top: -10px; 
+  font-weight: 600;
 }
 
 /* BET SLIP */

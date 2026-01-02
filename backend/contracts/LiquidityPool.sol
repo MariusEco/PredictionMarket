@@ -1,27 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract LiquidityPool is Ownable {
-    constructor() Ownable(msg.sender) {}
-    
-    mapping(address => uint) public balances;
-    uint public totalLiquidity;
 
+    mapping(address => uint256) private balances;
+    uint256 public totalLiquidity;
     address public predictionMarket;
 
-    event Deposited(address indexed user, uint amount);
-    event Withdrawn(address indexed user, uint amount);
-    event Transferred(address indexed to, uint amount);
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event PayoutExecuted(address indexed to, uint256 amount);
 
-    modifier hasBalance(address user) {
-        require(balances[user] > 0, "No balance to withdraw");
-        _;
-    }
+    constructor() Ownable(msg.sender) {}
 
-    modifier onlyOwnerOrPM() {
-        require(msg.sender == owner() || msg.sender == predictionMarket, "Not allowed");
+    modifier onlyPredictionMarket() {
+        require(msg.sender == predictionMarket, "Only PredictionMarket");
         _;
     }
 
@@ -30,28 +25,41 @@ contract LiquidityPool is Ownable {
     }
 
     function deposit() external payable {
-        require(msg.value > 0, "Must deposit > 0");
+        require(msg.value > 0, "Zero deposit");
+
         balances[msg.sender] += msg.value;
         totalLiquidity += msg.value;
+
         emit Deposited(msg.sender, msg.value);
     }
 
-    function withdraw(uint amount) external hasBalance(msg.sender) {
-        require(amount <= balances[msg.sender], "Not enough balance");
+    function withdraw(uint256 amount) external {
+        require(amount > 0, "Zero withdraw");
+        require(balances[msg.sender] >= amount, "Not enough deposited");
+
         balances[msg.sender] -= amount;
         totalLiquidity -= amount;
-        payable(msg.sender).transfer(amount);
+
+        (bool success,) = msg.sender.call{value: amount}("");
+        require(success, "Withdraw failed");
+
         emit Withdrawn(msg.sender, amount);
     }
 
-    function transfer(address to, uint amount) external onlyOwnerOrPM {
-        require(amount <= totalLiquidity, "Not enough liquidity");
+    function payout(address to, uint256 amount) external onlyPredictionMarket {
+        require(address(this).balance >= amount, "Insufficient liquidity");
+
         totalLiquidity -= amount;
-        payable(to).transfer(amount);
-        emit Transferred(to, amount);
+
+        (bool success,) = to.call{value: amount}("");
+        require(success, "Payout failed");
+
+        emit PayoutExecuted(to, amount);
     }
 
-    function getBalance(address user) external view returns (uint) {
+    function getBalance(address user) external view returns (uint256) {
         return balances[user];
     }
+
+    receive() external payable {}
 }
