@@ -28,6 +28,7 @@ function App() {
   const [selectedMatch, setSelectedMatch] = useState<number | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState<string>("0");
+  const [potentialPrize, setPotentialPrize] = useState<string>("0");
 
   const liquidityPoolAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const predictionMarketAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
@@ -185,6 +186,23 @@ function App() {
     alert("Event resolved and payouts executed");
   };
 
+  const handleBetAmountChange = async (val: string) => {
+    setBetAmount(val);
+
+    if (!pmContract || !val) {
+      setPotentialPrize("0");
+      return;
+    }
+
+    try {
+      const prize = await pmContract.calculatePotentialPrize(ethers.parseEther(val), 2);
+      setPotentialPrize(ethers.formatEther(prize));
+    } catch (err) {
+      console.error("Failed to calculate potential prize", err);
+      setPotentialPrize("0");
+    }
+  };
+
   return (
     <div className="app">
       {!account ? (
@@ -218,7 +236,7 @@ function App() {
           </div>
 
           {/* LIQUIDITY POOL */}
-          <div className="card">
+          <div className="card card-column">
             <h2>Liquidity Pool</h2>
             <input className="input" placeholder="Deposit ETH" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
             <button className="button-secondary" onClick={handleDeposit}>Deposit</button>
@@ -257,7 +275,8 @@ function App() {
               <h2>Bet Slip</h2>
               <p>Selected Match: {matches.find(m => m.id === selectedMatch)?.home} vs {matches.find(m => m.id === selectedMatch)?.away}</p>
               <p>Selected outcome: {selectedOutcome === 0 ? "1" : selectedOutcome === 1 ? "X" : "2"}</p>
-              <input className="input" placeholder="Stake (ETH)" value={betAmount} onChange={e => setBetAmount(e.target.value)} />
+              <input className="input" placeholder="Stake (ETH)" value={betAmount} onChange={e => { setBetAmount(e.target.value); handleBetAmountChange(e.target.value); }} />
+              <p>Potential Prize: {potentialPrize} ETH</p>
               <button className="button-primary" onClick={handlePlaceBet}>Place Bet</button>
             </div>
           )}
