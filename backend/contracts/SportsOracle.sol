@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SportsOracle is Ownable {
-
     mapping(uint256 => bool) public resolved;
 
     mapping(uint256 => uint8) private results;
@@ -13,7 +12,7 @@ contract SportsOracle is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
-    function setResult(uint256 eventId, uint8 outcome) external onlyOwner {
+    function setResultFromApi(uint256 eventId, uint8 outcome) external onlyOwner {
         require(!resolved[eventId], "Already resolved");
         require(outcome <= 2, "Invalid outcome");
 

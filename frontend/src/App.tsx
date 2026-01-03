@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { ethers } from "ethers";
 import "./App.css";
-import { connectLiquidityPool, connectPredictionMarket } from "./utils/contractUtils";
+import { connectLiquidityPool, connectPredictionMarket, connectSportsOracle } from "./utils/contractUtils";
 
 type Match = {
   id: number;
   home: string;
   away: string;
-  time: string;   // ora de start sau "LIVE"
-  score: string;  // scor live sau 0 - 0
-  minute?: number; // minutul meciului dacă e live
+  time: string;
+  score: string;
+  minute?: number;
 };
 
 function App() {
@@ -17,6 +17,7 @@ function App() {
   const [_, setProvider] = useState<ethers.BrowserProvider | null>(null);
   const [lpContract, setLpContract] = useState<any>(null);
   const [pmContract, setPmContract] = useState<any>(null);
+  const [oracleContract, setOracleContract] = useState<any>(null);
 
   const [depositAmount, setDepositAmount] = useState<string>("0");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("0");
@@ -30,6 +31,7 @@ function App() {
 
   const liquidityPoolAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const predictionMarketAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  const sportsOracleAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
 
   const connectWalletAndContracts = async () => {
     if (!(window as any).ethereum) {
@@ -47,9 +49,11 @@ function App() {
 
     const lp = await connectLiquidityPool(prov, liquidityPoolAddress);
     const pm = await connectPredictionMarket(prov, predictionMarketAddress);
+    const oracle = await connectSportsOracle(prov, sportsOracleAddress);
 
     setLpContract(lp);
     setPmContract(pm);
+    setOracleContract(oracle);
 
     await updateBalances(lp, address);
     setupEventListeners(lp, pm, address);
@@ -102,14 +106,14 @@ function App() {
       const ongoing = data.response.filter((m: any) => m.fixture.status.short !== "FT");
 
       const allMatches: Match[] = ongoing.map((m: any) => {
-        const isLive = m.fixture.status.short !== "NS"; // NS = Not started
+        const isLive = m.fixture.status.short !== "NS";
         const timeOrLive = isLive
           ? "LIVE"
           : new Date(m.fixture.date).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Europe/Bucharest",
-            });
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Europe/Bucharest",
+          });
         const score = isLive
           ? `${m.goals.home} - ${m.goals.away}`
           : "0 - 0";
@@ -120,7 +124,7 @@ function App() {
           away: m.teams.away.name,
           time: timeOrLive,
           score: score,
-          minute: isLive ? m.fixture.status.elapsed : undefined, // minut live
+          minute: isLive ? m.fixture.status.elapsed : undefined,
         };
       });
 
@@ -148,6 +152,37 @@ function App() {
     await tx.wait();
     setSelectedOutcome(null);
     setSelectedMatch(null);
+  };
+
+  const resolveEventFromApi = async (matchId: number) => {
+    if (!oracleContract || !pmContract) return;
+
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures?id=${matchId}`,
+      {
+        headers: {
+          "x-apisports-key": import.meta.env.VITE_API_SPORTS_KEY,
+        },
+      }
+    );
+
+    const data = await res.json();
+    const match = data.response[0];
+
+    const home = match.goals.home;
+    const away = match.goals.away;
+
+    let outcome = 1;
+    if (home > away) outcome = 0;
+    if (away > home) outcome = 2;
+
+    const tx1 = await oracleContract.setResultFromApi(matchId, outcome);
+    await tx1.wait();
+
+    const tx2 = await pmContract.resolveEvent(matchId);
+    await tx2.wait();
+
+    alert("Event resolved and payouts executed");
   };
 
   return (
@@ -198,7 +233,7 @@ function App() {
               <h2>{m.home} vs {m.away}</h2>
               <p className="timetext">
                 {m.time === "LIVE" ? (
-                  <span style={{color: "red"}}>LIVE {m.minute}'</span>
+                  <span style={{ color: "red" }}>LIVE {m.minute}'</span>
                 ) : (
                   `Start: ${m.time}`
                 )} | Score: {m.score}
@@ -211,6 +246,8 @@ function App() {
                 <button className={`odd ${selectedMatch === m.id && selectedOutcome === 2 ? "active" : ""}`}
                   onClick={() => { setSelectedMatch(m.id); setSelectedOutcome(2); }}>2</button>
               </div>
+
+              <button className="button-secondary" onClick={() => resolveEventFromApi(m.id)}>Resolve Event</button>
             </div>
           ))}
 
