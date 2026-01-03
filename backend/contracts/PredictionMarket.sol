@@ -9,7 +9,6 @@ interface ISportsOracle {
 }
 
 contract PredictionMarket is Ownable {
-
     struct Bet {
         uint256 amount;
         uint8 outcome;
@@ -22,8 +21,17 @@ contract PredictionMarket is Ownable {
     LiquidityPool public pool;
     ISportsOracle public sportsOracle;
 
-    event BetPlaced(uint256 indexed eventId, address indexed bettor, uint256 amount, uint8 outcome);
-    event Payout(uint256 indexed eventId, address indexed bettor, uint256 amount);
+    event BetPlaced(
+        uint256 indexed eventId,
+        address indexed bettor,
+        uint256 amount,
+        uint8 outcome
+    );
+    event Payout(
+        uint256 indexed eventId,
+        address indexed bettor,
+        uint256 amount
+    );
     event SportsOracleSet(address oracle);
 
     constructor(address payable _pool) Ownable(msg.sender) {
@@ -64,13 +72,9 @@ contract PredictionMarket is Ownable {
             if (!b.paid && b.outcome == winningOutcome) {
                 uint256 prize = b.amount * 2;
 
-                require(address(this).balance >= prize, "Insufficient funds in PredictionMarket");
-
-                (bool success,) = payable(b.bettor).call{value: prize}("");
-                require(success, "Payout failed");
+                pool.payout(b.bettor, prize);
 
                 b.paid = true;
-
                 emit Payout(eventId, b.bettor, prize);
             }
         }
