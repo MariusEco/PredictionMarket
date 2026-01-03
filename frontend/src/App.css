@@ -57,6 +57,12 @@
   color: var(--yellow-main);
 }
 
+.card-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* BALANCE */
 .balance {
   display: flex;
@@ -129,6 +135,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .odd {
@@ -185,4 +192,9 @@
 
 .bet-slip .button-primary {
   width: 100%;
+}
+
+.bet-slip p {
+  margin-bottom: 10px;
+  line-height: 1.4;
 }

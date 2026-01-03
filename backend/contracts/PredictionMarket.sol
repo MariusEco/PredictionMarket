@@ -70,7 +70,7 @@ contract PredictionMarket is Ownable {
             Bet storage b = eventBets[i];
 
             if (!b.paid && b.outcome == winningOutcome) {
-                uint256 prize = b.amount * 2;
+                uint256 prize = calculatePotentialPrize(b.amount, 2);
 
                 pool.payout(b.bettor, prize);
 
@@ -78,5 +78,12 @@ contract PredictionMarket is Ownable {
                 emit Payout(eventId, b.bettor, prize);
             }
         }
+    }
+
+    function calculatePotentialPrize(uint256 betAmount, uint8 multiplier) public pure returns (uint256) {
+        require(betAmount > 0, "Bet must be > 0");
+        require(multiplier > 0, "Multiplier must be > 0");
+
+        return betAmount * multiplier;
     }
 }
