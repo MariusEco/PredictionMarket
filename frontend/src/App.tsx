@@ -87,7 +87,7 @@ function App() {
 
     pm.on("Payout", (_eventId: bigint, bettor: string, amount: bigint) => {
       if (bettor.toLowerCase() === addr.toLowerCase()) {
-        console.log(`You won ${ethers.formatEther(amount)} ETH`);
+        console.log(`${bettor} won ${ethers.formatEther(amount)} ETH`);
         updateBalances(lp, addr);
       }
     });
@@ -104,7 +104,9 @@ function App() {
       );
       const data = await res.json();
 
-      const ongoing = data.response.filter((m: any) => m.fixture.status.short !== "FT");
+      const INVALID_STATUSES = ["FT", "PST", "CANC", "ABD"];
+
+      const ongoing = data.response.filter((m: any) => !INVALID_STATUSES.includes(m.fixture.status.short));
 
       const allMatches: Match[] = ongoing.map((m: any) => {
         const isLive = m.fixture.status.short !== "NS";
