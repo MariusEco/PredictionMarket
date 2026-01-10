@@ -160,32 +160,61 @@ function App() {
   const resolveEventFromApi = async (matchId: number) => {
     if (!oracleContract || !pmContract) return;
 
-    const res = await fetch(
-      `https://v3.football.api-sports.io/fixtures?id=${matchId}`,
-      {
-        headers: {
-          "x-apisports-key": import.meta.env.VITE_API_SPORTS_KEY,
-        },
+    try {
+      const res = await fetch(
+        `https://v3.football.api-sports.io/fixtures?id=${matchId}`,
+        {
+          headers: {
+            "x-apisports-key": import.meta.env.VITE_API_SPORTS_KEY,
+          },
+        }
+      );
+
+      const data = await res.json();
+      const match = data.response[0];
+
+      const status = match.fixture.status.short;
+
+      if (status !== "FT") {
+        alert("Match is not finished yet");
+        return;
       }
-    );
 
-    const data = await res.json();
-    const match = data.response[0];
+      const home = match.goals.home;
+      const away = match.goals.away;
 
-    const home = match.goals.home;
-    const away = match.goals.away;
+      if (home === null || away === null) {
+        alert("Match result not available yet");
+        return;
+      }
 
-    let outcome = 1;
-    if (home > away) outcome = 0;
-    if (away > home) outcome = 2;
+      let outcome = 1;
+      if (home > away) outcome = 0;
+      if (away > home) outcome = 2;
 
-    const tx1 = await oracleContract.setResultFromApi(matchId, outcome);
-    await tx1.wait();
+      try {
+        const tx1 = await oracleContract.setResultFromApi(matchId, outcome);
+        await tx1.wait();
+      } catch (err) {
+        console.error(err);
+        alert("Result already set or you are not allowed");
+        return;
+      }
 
-    const tx2 = await pmContract.resolveEvent(matchId);
-    await tx2.wait();
+      try {
+        const tx2 = await pmContract.resolveEvent(matchId);
+        await tx2.wait();
+      } catch (err) {
+        console.error(err);
+        alert("Event already resolved or payouts failed");
+        return;
+      }
 
-    alert("Event resolved and payouts executed");
+      alert("Event resolved and payouts executed");
+    } catch (err) {
+      console.error(err);
+      alert("Unexpected error occurred");
+    }
   };
 
   const handleBetAmountChange = async (val: string) => {
